@@ -116,24 +116,35 @@ public static class SetsAndMaps
             "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
 
         using var client = new HttpClient();
-        using var getRequestMessage =
-            new HttpRequestMessage(HttpMethod.Get, uri);
-        using var jsonStream =
-            client.Send(getRequestMessage).Content.ReadAsStream();
-        using var reader = new StreamReader(jsonStream);
+        using var response = client.GetAsync(uri).GetAwaiter().GetResult();
+        response.EnsureSuccessStatusCode();
 
-        var json = reader.ReadToEnd();
+        var json = response.Content.ReadAsStringAsync()
+            .GetAwaiter().GetResult();
+
         var options = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         };
 
         var featureCollection =
-            JsonSerializer.Deserialize<FeatureCollection>(json, options);
+            JsonSerializer.Deserialize<FeatureCollection>(json, options)
+            ?? throw new InvalidOperationException(
+                "Unable to read earthquake data.");
 
-        // TODO Problem 5:
-        // Define the JSON classes in FeatureCollection.cs.
-        // Return formatted strings containing each place and magnitude.
-        return [];
+        var summaries = new List<string>();
+
+        foreach (var feature in featureCollection.Features)
+        {
+            var properties = feature.Properties;
+
+            var magnitude = properties.Mag?.ToString(
+                System.Globalization.CultureInfo.InvariantCulture)
+                ?? "Unknown";
+
+            summaries.Add($"{properties.Place} - Mag {magnitude}");
+        }
+
+        return summaries.ToArray();
     }
 }
